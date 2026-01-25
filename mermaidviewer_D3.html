@@ -52,6 +52,8 @@
 
   .donate-btn { background-color: #28a745; }
   .donate-link { color: white; text-decoration: none; }
+  .docs-link { color: #007bff; text-decoration: none; font-weight: 600; }
+  .docs-link:hover { text-decoration: underline; }
 
   .container { display: flex; flex-grow: 1; gap: 20px; min-height: 0; }
 
@@ -137,7 +139,10 @@
    <button id="toggle-editor-button">Hide Editor</button>
   </div>
   <div class="button-group">
-   <span style="font-size: 12px; color: #666;">mermaid v11.4.1, w/D3.js</span>
+   <span style="font-size: 12px; color: #666;">
+     mermaid v11.4.1, w/D3.js | 
+     <a href="https://mermaid.js.org/intro/" target="_blank" class="docs-link">Docs</a>
+   </span>
    <button class="donate-btn">
     <a href="https://www.paypal.com/donate/?business=4A9E9V4R5YBXY&no_recurring=1&currency_code=USD" target="_blank" class="donate-link">Donate</a>
    </button>
@@ -201,13 +206,10 @@ graph TD
   const svgSelection = d3.select(previewPanel);
   svgSelection.call(zoom);
 
-  // Helper to get title from code or fallback to document title
   function getDiagramTitle() {
     const code = mermaidCode.value;
-    // Regex matches YAML frontmatter title or direct title directive
     const titleMatch = code.match(/(?:^|(?:\r?\n))(?:\s*title:\s*|---\s*title:\s*)([^\r\n-]+)/i);
     let name = (titleMatch && titleMatch[1]) ? titleMatch[1].trim() : document.title;
-    // Sanitize filename
     return name.replace(/[\\/:*?"<>|]/g, '_');
   }
 
@@ -250,8 +252,8 @@ graph TD
 
   let timeout;
   mermaidCode.addEventListener('input', () => {
-    clearTimeout(timeout);
-    timeout = setTimeout(render, 300);
+   clearTimeout(timeout);
+   timeout = setTimeout(render, 300);
   });
 
   document.getElementById('zoom-in').onclick = () => svgSelection.transition().call(zoom.scaleBy, 1.3);
