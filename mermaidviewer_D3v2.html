@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Mermaid Editor</title>
+ <style>
+  :root {
+   --bg-color: #e9f2f8;
+   --panel-bg: #ffffff;
+   --text-color: #333333;
+   --header-color: #004d66;
+   --editor-bg: #f8f9fa;
+   --border-color: #dddddd;
+  }
+
+  [data-theme="dark"] {
+   --bg-color: #1a1e24;
+   --panel-bg: #242933;
+   --text-color: #e5e9f0;
+   --header-color: #88c0d0;
+   --editor-bg: #2e3440;
+   --border-color: #4c566a;
+  }
+
+  body {
+   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+   display: flex;
+   flex-direction: column;
+   height: 100vh;
+   margin: 0;
+   padding: 10px;
+   background-color: var(--bg-color);
+   color: var(--text-color);
+   box-sizing: border-box;
+   overflow: hidden;
+   transition: background-color 0.3s, color 0.3s;
+  }
+
+  h1 { text-align: center; color: var(--header-color); margin: 0 0 7px 0; font-weight: 300; font-size: 24px; }
+
+  .controls {
+   display: flex;
+   justify-content: space-between;
+   gap: 10px;
+   margin-bottom: 7px;
+   align-items: center;
+   background: var(--panel-bg);
+   padding: 6px 10px;
+   border-radius: 6px;
+   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  .button-group { display: flex; gap: 6px; align-items: center; }
+
+  button {
+   padding: 5px 9px;
+   border: none;
+   border-radius: 4px;
+   font-size: 13px;
+   cursor: pointer;
+   background-color: #007bff;
+   color: white;
+   font-weight: 600;
+   transition: background 0.2s, opacity 0.2s;
+  }
+
+  button:hover { opacity: 0.9; }
+  .action-button { background-color: #28a745; }
+  .secondary-btn { background-color: #6c757d; }
+  .theme-toggle { background-color: #17a2b8; }
+
+  .donate-btn { background-color: #28a745; }
+  .donate-link { color: white; text-decoration: none; }
+  .docs-link { color: #007bff; text-decoration: none; font-weight: 600; }
+  .docs-link:hover { text-decoration: underline; }
+
+  .container { display: flex; flex-grow: 1; gap: 10px; min-height: 0; }
+
+  .editor { flex: 0 0 25%; display: flex; flex-direction: column; background: var(--panel-bg); border-radius: 6px; box-shadow: 0 3px 9px rgba(0, 0, 0, 0.12); overflow: hidden; }
+
+  .preview {
+   flex: 1;
+   background-color: var(--panel-bg);
+   border-radius: 6px;
+   box-shadow: 0 3px 9px rgba(0, 0, 0, 0.12);
+   overflow: hidden;
+   position: relative;
+   cursor: grab;
+  }
+
+  .preview:active { cursor: grabbing; }
+
+  textarea {
+   width: 100%;
+   height: 100%;
+   padding: 10px;
+   border: none;
+   outline: none;
+   font-family: 'Fira Code', 'Consolas', monospace;
+   font-size: 13px;
+   background-color: var(--editor-bg);
+   color: var(--text-color);
+   resize: none;
+   box-sizing: border-box;
+   white-space: pre;
+   overflow-x: auto;
+  }
+
+  #mermaid-preview-container { 
+   width: 100%; 
+   height: 100%; 
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   transform-origin: 0 0;
+  }
+  
+  #mermaid-preview-container svg { 
+   display: block; 
+   max-width: none !important;
+  }
+
+  .error-overlay {
+   position: absolute;
+   top: 10px;
+   left: 10px;
+   right: 10px;
+   background: #fff5f5;
+   color: #c53030;
+   padding: 10px;
+   border-left: 4px solid #fc8181;
+   border-radius: 4px;
+   font-family: 'Fira Code', monospace;
+   font-size: 12px;
+   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+   z-index: 1000;
+   white-space: pre-wrap;
+   max-height: 150px;
+   overflow-y: auto;
+  }
+
+  .zoom-controls {
+   position: absolute;
+   bottom: 15px;
+   right: 15px;
+   display: flex;
+   flex-direction: column;
+   gap: 8px;
+   z-index: 100;
+  }
+
+  .zoom-btn {
+   width: 38px;
+   height: 38px;
+   border-radius: 50%;
+   background-color: var(--header-color); 
+   color: white; 
+   font-size: 18px;
+   display: flex; 
+   align-items: center; 
+   justify-content: center;
+   box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+   padding: 0;
+   border: none;
+   cursor: pointer;
+  }
+
+  .hidden { display: none !important; }
+  #file-input { display: none; }
+ </style>
+</head>
+<body>
+
+ <h1 id="main-title" class="hidden">Mermaid Editor</h1>
+
+ <div class="controls" id="toolbar">
+  <div class="button-group">
+   <button id="save-code-button" class="action-button">Save Code</button>
+   <button id="load-code-button" class="secondary-btn">Load Code</button>
+   <button id="save-svg-button">SVG</button>
+   <button id="toggle-editor-button" class="secondary-btn">Hide Editor</button>
+  </div>
+  <div class="button-group">
+   <button id="theme-toggle-btn" class="theme-toggle">🌙 Dark Mode</button>
+   <span style="font-size: 12px; opacity: 0.8;">
+     mermaid <span id="mermaid-version">Loading...</span> | 
+     <a href="https://mermaid.js.org/intro/" target="_blank" class="docs-link">Docs</a>
+   </span>
+   <button class="donate-btn">
+    <a href="https://www.paypal.com/donate/?business=4A9E9V4R5YBXY&no_recurring=1&currency_code=USD" target="_blank" class="donate-link">Donate</a>
+   </button>
+  </div>
+ </div>
+
+ <div class="container">
+  <div class="editor" id="editor-panel">
+   <textarea id="mermaid-code" spellcheck="false" wrap="off">---
+title: Project Workflow
+---
+graph TD
+    A[Start] --> B(Process)
+    B --> C{Decision}
+    C -- Yes --> D[Result 1]
+    C -- No --> E[Result 2]
+    D --> F[End]
+    E --> F</textarea>
+  </div>
+
+  <div class="preview" id="preview-panel">
+   <button id="back-to-editor-button" style="position:absolute; top:10px; right:10px; z-index:100; background-color:#dc3545;" class="hidden">Show Editor</button>
+
+   <div class="zoom-controls">
+    <button id="zoom-in" class="zoom-btn" title="Zoom In">+</button>
+    <button id="zoom-out" class="zoom-btn" title="Zoom Out">−</button>
+    <button id="zoom-reset" class="zoom-btn" title="Fit to Screen">⛶</button>
+   </div>
+
+   <div id="mermaid-preview-container"></div>
+   <div id="error-display"></div>
+  </div>
+ </div>
+
+ <input type="file" id="file-input" accept=".mmd,.txt">
+
+ <script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.esm.min.mjs';
+  import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@latest/+esm';
+
+  const mermaidCode = document.getElementById('mermaid-code');
+  const previewContainer = document.getElementById('mermaid-preview-container');
+  const previewPanel = document.getElementById('preview-panel');
+  const errorDisplay = document.getElementById('error-display');
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  const versionDisplay = document.getElementById('mermaid-version');
+
+  if (mermaid.version) {
+    versionDisplay.textContent = `v${mermaid.version}`;
+  } else {
+    fetch('https://cdn.jsdelivr.net/npm/mermaid@latest/package.json')
+      .then(res => res.json())
+      .then(pkg => { versionDisplay.textContent = `v${pkg.version}`; })
+      .catch(() => { versionDisplay.textContent = 'latest'; });
+  }
+
+  let currentTheme = localStorage.getItem('theme') || 'light';
+  if (currentTheme === 'dark') document.body.setAttribute('data-theme', 'dark');
+
+  function initMermaid(theme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: theme === 'dark' ? 'dark' : 'default',
+      securityLevel: 'loose',
+      flowchart: { useMaxWidth: false, htmlLabels: true }
+    });
+  }
+
+  initMermaid(currentTheme);
+
+  const zoom = d3.zoom()
+    .scaleExtent([0.1, 10])
+    .on('zoom', (event) => {
+      d3.select('#mermaid-preview-container')
+        .style('transform', `translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`);
+    });
+
+  const svgSelection = d3.select(previewPanel);
+  svgSelection.call(zoom);
+
+  function getDiagramTitle() {
+    const code = mermaidCode.value;
+    const titleMatch = code.match(/(?:^|(?:\r?\n))(?:\s*title:\s*|---\s*title:\s*)([^\r\n-]+)/i);
+    let name = (titleMatch && titleMatch[1]) ? titleMatch[1].trim() : document.title;
+    return name.replace(/[\\/:*?"<>|]/g, '_');
+  }
+
+  async function render() {
+   const code = mermaidCode.value;
+   if (!code.trim()) {
+     previewContainer.innerHTML = '';
+     errorDisplay.innerHTML = '';
+     return;
+   }
+
+   try {
+    await mermaid.parse(code);
+    errorDisplay.innerHTML = '';
+    previewContainer.style.opacity = "1";
+
+    const id = 'mermaid-' + Math.floor(Math.random() * 100000);
+    const { svg } = await mermaid.render(id, code);
+
+    previewContainer.innerHTML = svg;
+    localStorage.setItem('lastMermaidCode', code);
+    
+    setTimeout(resetZoom, 50);
+   } catch (e) {
+    const cleanError = e.message ? e.message.replace(/</g, '&lt;').replace(/>/g, '&gt;') : e;
+    errorDisplay.innerHTML = `<div class="error-overlay"><strong>Syntax Error:</strong><br>${cleanError}</div>`;
+    previewContainer.style.opacity = "0.5";
+   }
+  }
+
+  function resetZoom() {
+    const container = previewPanel.getBoundingClientRect();
+    const svg = previewContainer.querySelector('svg');
+    if (!svg) return;
+
+    previewContainer.style.transform = 'none';
+
+    const bbox = svg.getBoundingClientRect();
+    if (bbox.width === 0 || bbox.height === 0) return;
+
+    const padding = 60;
+    const availableWidth = container.width - padding;
+    const availableHeight = container.height - padding;
+
+    const scale = Math.min(
+      availableWidth / bbox.width,
+      availableHeight / bbox.height,
+      1
+    );
+
+    const x = (container.width - bbox.width * scale) / 2;
+    const y = (container.height - bbox.height * scale) / 2;
+
+    const transform = d3.zoomIdentity.translate(x, y).scale(scale);
+    svgSelection.transition().duration(350).call(zoom.transform, transform);
+  }
+
+  let timeout;
+  mermaidCode.addEventListener('input', () => {
+   clearTimeout(timeout);
+   timeout = setTimeout(render, 300);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      document.getElementById('save-code-button').click();
+    }
+  });
+
+  themeToggleBtn.onclick = () => {
+    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+    if (currentTheme === 'dark') {
+      document.body.setAttribute('data-theme', 'dark');
+      themeToggleBtn.textContent = '☀️ Light Mode';
+    } else {
+      document.body.removeAttribute('data-theme');
+      themeToggleBtn.textContent = '🌙 Dark Mode';
+    }
+    localStorage.setItem('theme', currentTheme);
+    initMermaid(currentTheme);
+    render();
+  };
+
+  document.getElementById('zoom-in').onclick = () => {
+    const { width, height } = previewPanel.getBoundingClientRect();
+    svgSelection.transition().duration(250).call(
+      zoom.scaleBy, 
+      1.3, 
+      [width / 2, height / 2]
+    );
+  };
+
+  document.getElementById('zoom-out').onclick = () => {
+    const { width, height } = previewPanel.getBoundingClientRect();
+    svgSelection.transition().duration(250).call(
+      zoom.scaleBy, 
+      0.7, 
+      [width / 2, height / 2]
+    );
+  };
+
+  document.getElementById('zoom-reset').onclick = resetZoom;
+
+  window.addEventListener('load', async () => {
+   const saved = localStorage.getItem('lastMermaidCode');
+   if (saved) mermaidCode.value = saved;
+   await render();
+  });
+
+  document.getElementById('save-svg-button').onclick = () => {
+   const svgNode = previewContainer.querySelector('svg');
+   if (!svgNode) return;
+
+   const svgCloned = svgNode.cloneNode(true);
+   svgCloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+   svgCloned.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+   // Ensure style block is cloned to preserve text label fonts and node colors
+   const liveStyles = svgNode.querySelectorAll('style');
+   liveStyles.forEach(style => {
+     svgCloned.insertBefore(style.cloneNode(true), svgCloned.firstChild);
+   });
+
+   let vbX = 0, vbY = 0, vbW = 800, vbH = 600;
+   try {
+     const bbox = svgNode.getBBox();
+     if (bbox.width > 0 && bbox.height > 0) {
+       vbX = bbox.x - 20;
+       vbY = bbox.y - 20;
+       vbW = bbox.width + 40;
+       vbH = bbox.height + 40;
+     }
+   } catch(e) {
+     const viewBoxAttr = svgNode.getAttribute('viewBox');
+     if (viewBoxAttr) {
+       const vbValues = viewBoxAttr.split(/[\s,]+/).map(Number);
+       if (vbValues.length === 4 && vbValues[2] > 0 && vbValues[3] > 0) {
+         [vbX, vbY, vbW, vbH] = vbValues;
+       }
+     }
+   }
+
+   svgCloned.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+   svgCloned.setAttribute('width', vbW);
+   svgCloned.setAttribute('height', vbH);
+
+   // Wrap content in interactive transform group
+   const originalContent = svgCloned.innerHTML;
+   svgCloned.innerHTML = `<g id="svg-diagram-content">${originalContent}</g>`;
+
+   // Construct embedded interactive vector controls
+   const btnGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+   btnGroup.setAttribute('id', 'exported-zoom-controls');
+
+   const btnSize = Math.max(Math.min(vbW, vbH) * 0.05, 32);
+   const gap = btnSize * 0.25;
+   const padding = btnSize * 0.6;
+
+   const totalHeight = (btnSize * 3) + (gap * 2);
+   const startX = vbX + vbW - padding - btnSize;
+   const startY = vbY + vbH - padding - totalHeight;
+
+   const buttonsData = [
+     { id: 'svg-btn-in', symbol: '+', y: startY },
+     { id: 'svg-btn-out', symbol: '−', y: startY + btnSize + gap },
+     { id: 'svg-btn-fit', symbol: '⛶', y: startY + (btnSize + gap) * 2 }
+   ];
+
+   buttonsData.forEach(btn => {
+     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+     group.setAttribute('id', btn.id);
+     group.setAttribute('style', 'cursor: pointer;');
+
+     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+     circle.setAttribute('cx', startX + btnSize / 2);
+     circle.setAttribute('cy', btn.y + btnSize / 2);
+     circle.setAttribute('r', btnSize / 2);
+     circle.setAttribute('fill', '#004d66');
+     circle.setAttribute('stroke', '#ffffff');
+     circle.setAttribute('stroke-width', btnSize * 0.06);
+
+     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+     text.setAttribute('x', startX + btnSize / 2);
+     text.setAttribute('y', btn.y + btnSize / 2 + (btnSize * 0.18));
+     text.setAttribute('text-anchor', 'middle');
+     text.setAttribute('fill', '#ffffff');
+     text.setAttribute('font-family', 'Segoe UI, sans-serif');
+     text.setAttribute('font-size', `${btnSize * 0.55}px`);
+     text.setAttribute('font-weight', 'bold');
+     text.textContent = btn.symbol;
+
+     group.appendChild(circle);
+     group.appendChild(text);
+     btnGroup.appendChild(group);
+   });
+
+   // Embed self-contained script directly inside the SVG element
+   const svgScript = document.createElementNS('http://www.w3.org/2000/svg', 'script');
+   svgScript.textContent = `
+    document.addEventListener('DOMContentLoaded', () => {
+      const content = document.getElementById('svg-diagram-content');
+      if (!content) return;
+      let scale = 1;
+      let translateX = 0;
+      let translateY = 0;
+
+      function updateTransform() {
+        content.setAttribute('transform', 'translate(' + translateX + ',' + translateY + ') scale(' + scale + ')');
+      }
+
+      document.getElementById('svg-btn-in')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scale *= 1.25;
+        updateTransform();
+      });
+
+      document.getElementById('svg-btn-out')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scale /= 1.25;
+        updateTransform();
+      });
+
+      document.getElementById('svg-btn-fit')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        updateTransform();
+      });
+    });
+   `;
+
+   svgCloned.appendChild(btnGroup);
+   svgCloned.appendChild(svgScript);
+
+   const serializer = new XMLSerializer();
+   const svgString = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + serializer.serializeToString(svgCloned);
+
+   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+   const url = URL.createObjectURL(blob);
+   const a = document.createElement('a');
+   a.href = url;
+   a.download = `${getDiagramTitle()}.svg`;
+   document.body.appendChild(a);
+   a.click();
+   document.body.removeChild(a);
+   URL.revokeObjectURL(url);
+  };
+
+  document.getElementById('save-code-button').onclick = () => {
+   const blob = new Blob([mermaidCode.value], {type: 'text/plain'});
+   const a = document.createElement('a');
+   a.href = URL.createObjectURL(blob);
+   a.download = `${getDiagramTitle()}.mmd`;
+   a.click();
+   URL.revokeObjectURL(a.href);
+  };
+
+  document.getElementById('load-code-button').onclick = () => document.getElementById('file-input').click();
+  document.getElementById('file-input').onchange = (e) => {
+   if (!e.target.files[0]) return;
+   const reader = new FileReader();
+   reader.onload = (ev) => { mermaidCode.value = ev.target.result; render(); };
+   reader.readAsText(e.target.files[0]);
+  };
+
+  const toggle = () => {
+   document.getElementById('editor-panel').classList.toggle('hidden');
+   document.getElementById('toolbar').classList.toggle('hidden');
+   document.getElementById('back-to-editor-button').classList.toggle('hidden');
+   document.getElementById('main-title').classList.toggle('hidden');
+  };
+  document.getElementById('toggle-editor-button').onclick = toggle;
+  document.getElementById('back-to-editor-button').onclick = toggle;
+ </script>
+</body>
+</html>
